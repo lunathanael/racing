@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+
+cd "$(dirname "$0")"
+
+CLEAN=0
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            CLEAN=1
+            ;;
+    esac
+done
+
+if [ -f "./emsdk/emsdk_env.sh" ]; then
+    source ./emsdk/emsdk_env.sh >/dev/null 2>&1
+else
+    echo "Warning: emsdk_env.sh not found in ./emsdk/. You may need to install or source it manually."
+fi
+
+mkdir -p build build-wasm
+cmake -G Ninja -S . -B build
+emcmake cmake -G Ninja -S . -B build-wasm
+
+if [ "$CLEAN" -eq 1 ]; then
+    cmake --build build --target clean
+    cmake --build build-wasm/ --target clean
+fi
+
+echo "Building Racer Binary"
+cmake --build build/ --parallel --target racer
+
+echo "Building RL Racer"
+cmake --build build/ --parallel --target racer_rl
+
+echo "Building AP Racer"
+cmake --build build/ --parallel --target racer_ap
+
+echo "Building WASM Emscripten Racer"
+cmake --build build-wasm/ --parallel --target racer
+
+echo "Building AP Racer"
+cmake --build build-wasm/ --parallel --target racer_ap
+
+echo "Native: ./build/racer"
+echo "WASM:   cd build-wasm && python3 -m http.server"
