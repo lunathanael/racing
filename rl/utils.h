@@ -26,8 +26,12 @@ template <class T, size_t size> using Tensor = std::array<T, size>;
 
 namespace rand
 {
-std::random_device rd;
-std::mt19937 gen(rd());
+inline std::mt19937 gen;
+
+template <class... Args> void seed(Args &&...args)
+{
+    gen.seed(std::forward<Args>(args)...);
+}
 
 template <class T> decltype(auto) random_uniform(const T &a, const T &b)
 {

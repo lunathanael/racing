@@ -3,9 +3,7 @@
 #include "rl/nn.h"
 #include "rl/optim.h"
 
-#include <algorithm>
 #include <cmath>
-#include <numeric>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -99,17 +97,17 @@ Action get_actions(Env &env, bool force_network = false)
 
     static nn::Sequential<nn::Linear<OBS_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
                           nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>>
-        seq;
+        seq("seq.bin");
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_steer;
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_drive;
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_steer("pol_steer.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_drive("pol_drive.bin");
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 1, T>> val;
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 1, T>> val("val.bin");
 
-    static nn::AdamW opt(seq.params(), 1e-3);
-    static nn::AdamW opt1a(pol_steer.params(), 1e-3);
-    static nn::AdamW opt1b(pol_drive.params(), 1e-3);
-    static nn::AdamW opt2(val.params(), 1e-3);
+    static nn::AdamW opt(seq.params(), 1e-4);
+    static nn::AdamW opt1a(pol_steer.params(), 1e-4);
+    static nn::AdamW opt1b(pol_drive.params(), 1e-4);
+    static nn::AdamW opt2(val.params(), 1e-4);
 
     struct Transition
     {
@@ -138,6 +136,18 @@ Action get_actions(Env &env, bool force_network = false)
             y = 2;
         return std::make_tuple(x, y);
     };
+
+    /*
+    normalization
+    scheduler
+    trajectory buffer
+    different algorithm
+    optimize code
+    gridsearch, random search
+    seeding
+
+    try bunch of stuff
+    */
 
     // auto decode_action = [](int action_int) -> Action
     // {
@@ -174,7 +184,6 @@ Action get_actions(Env &env, bool force_network = false)
     auto one_hot_decode = [](const auto &probs_steer, const auto &probs_drive) -> Action
     {
         Action act;
-        static std::mt19937 gen(std::random_device{}());
         {
             std::array<T, 3> arr;
             for (int i = 0; i < (int)3; ++i)
@@ -182,7 +191,7 @@ Action get_actions(Env &env, bool force_network = false)
                 arr[i] = static_cast<T>(probs_steer[i]);
             }
             std::discrete_distribution<int> d(arr.cbegin(), arr.cend());
-            auto x = d(gen);
+            auto x = d(nn::rand::gen);
 
             act.left = (x == 1);
             act.right = (x == 2);
@@ -194,7 +203,7 @@ Action get_actions(Env &env, bool force_network = false)
                 arr[i] = static_cast<T>(probs_drive[i]);
             }
             std::discrete_distribution<int> d(arr.cbegin(), arr.cend());
-            auto x = d(gen);
+            auto x = d(nn::rand::gen);
 
             act.accelerate = (x == 1);
             act.brake = (x == 2);
@@ -331,6 +340,7 @@ Action get_actions(Env &env, bool force_network = false)
     size_t score = env.get_game().get_race().get_lap_count() * env.get_game().get_race().get_vertex_count() +
                    env.get_game().get_race().get_next_vertex_idx();
     T reward = (static_cast<T>(score) - static_cast<T>(prev_score)) / 100;
+
     prev_score = score;
 
     auto [x, y] = encode_action(act);
@@ -432,6 +442,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     as->env.reset();
 
     as->force_nn = true; // default to nn
+
+    nn::rand::seed(42);
 
     return SDL_APP_CONTINUE;
 }
