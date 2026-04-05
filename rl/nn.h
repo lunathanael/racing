@@ -1,15 +1,16 @@
 #pragma once
 
 #include "rl/ag.h"
+#include "rl/core.h"
 #include "rl/params.h"
 #include "rl/utils.h"
 
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <ranges>
 #include <type_traits>
-#include <variant>
+
+#include <dependencies/mdspan.hpp>
 
 namespace nn
 {
@@ -43,11 +44,16 @@ public:
     static constexpr auto OUTPUT_DIM = N;
 
 protected:
-    auto _weight() { return _data().first(M * N) | std::ranges::views::chunk(M); }
+    auto _weight()
+    {
+        auto w = _data().first(M * N).data();
+        return std::mdspan(w, std::extents<size_t, M, N>{});
+    }
     auto _bias()
         requires(use_bias)
     {
-        return _data().last(N);
+        auto b = _data().last(N).data();
+        return std::mdspan(b, std::extents<size_t, 1, N>{});
     }
 
 public:
@@ -60,32 +66,21 @@ public:
         {
             for (size_t i = 0; i < N; ++i)
                 for (size_t j = 0; j < M; ++j)
-                    _weight()[i][j] = rand::random_uniform(-sqrt_k, sqrt_k);
+                    _weight()[i, j] = rand::random_uniform(-sqrt_k, sqrt_k);
 
             if constexpr (use_bias)
             {
                 for (size_t i = 0; i < N; ++i)
-                    _bias()[i] = rand::random_uniform(-sqrt_k, sqrt_k);
+                    _bias()[0, i] = rand::random_uniform(-sqrt_k, sqrt_k);
             }
         }
     }
 
-    auto forward(const auto &input)
+    template <class _T, size_t _M> auto forward(const Tensor<_T, _M> &input)
     {
-        Tensor<typename base_t::node_type, N> out;
-        for (size_t i = 0; i < N; ++i)
-        {
-            out[i] = {};
-            for (size_t j = 0; j < M; ++j)
-            {
-                out[i] += _weight()[i][j] * input[j];
-            }
-            if constexpr (use_bias)
-            {
-                out[i] += _bias()[i];
-            }
-        }
-        return out;
+        auto input_span = std::mdspan<const _T, std::extents<size_t, 1, _M>>(input.data());
+        auto out = matmul(input_span, _weight(), _bias());
+        return out[0];
     }
 };
 

@@ -87,6 +87,9 @@ set(RL_SOURCES
 )
 
 set(RL_HEADERS
+    dependencies/mdspan.hpp
+
+    rl/core.h
     rl/env.h
     rl/mutate.h
 )
