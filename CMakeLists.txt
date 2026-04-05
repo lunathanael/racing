@@ -71,7 +71,6 @@ target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR})
 # TARGET AP
 set(AP_SOURCES
     main_ap.cpp
-    rl/env.cpp
 )
 
 set(AP_HEADERS
@@ -85,7 +84,6 @@ target_include_directories(${TARGET_AP} PRIVATE ${CMAKE_SOURCE_DIR})
 # TARGET RL
 set(RL_SOURCES
     main_rl.cpp
-    rl/env.cpp
 )
 
 set(RL_HEADERS

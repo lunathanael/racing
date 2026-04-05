@@ -35,7 +35,7 @@ Action get_actions(const Env &env)
     constexpr f64_t MIN_DIST_TO_SHARP_TURN = 57.32;
 
     Action actions;
-    const auto &obs = env.get_obs();
+    const auto &obs = env.get_obs<100>();
 
     f64_t BRAKE_DIST = 0.5 * obs.vel.x * (obs.vel.x / Car::BREAKING_SPEED);
     f64_t dist{}, disty{};

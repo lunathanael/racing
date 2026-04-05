@@ -9,7 +9,8 @@
 
 Action get_actions(Env &env, bool force_network = false)
 {
-    constexpr size_t POINT_EL = Env::N_FUTURE_POINTS * 2;
+    constexpr size_t N_FUTURE_POINTS = 120;
+    constexpr size_t POINT_EL = N_FUTURE_POINTS * 2;
     constexpr size_t VEL_EL = 2;
 
     constexpr size_t OBS_DIM = POINT_EL + VEL_EL;
@@ -115,7 +116,7 @@ Action get_actions(Env &env, bool force_network = false)
         size_t cnt{};
         while (race.get_lap_count() == lap_start && ++cnt < MAX_TICKS)
         {
-            const auto &obs = ap_env.get_obs();
+            const auto &obs = ap_env.get_obs<N_FUTURE_POINTS>();
             auto input = get_input_arr(obs);
             auto h = seq.forward(input);
             auto probs_steer = pol_steer.forward(h);
@@ -218,7 +219,7 @@ Action get_actions(Env &env, bool force_network = false)
         episode.clear();
     }
 
-    const auto &obs = env.get_obs();
+    const auto &obs = env.get_obs<N_FUTURE_POINTS>();
     auto input = get_input_arr(obs);
 
     auto h = seq.forward(input);
