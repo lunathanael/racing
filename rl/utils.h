@@ -33,7 +33,13 @@ template <class... Args> void seed(Args &&...args)
     gen.seed(std::forward<Args>(args)...);
 }
 
-template <class T> decltype(auto) random_uniform(const T &a, const T &b)
+template <std::integral T> decltype(auto) random_uniform(const T &a, const T &b)
+{
+    std::uniform_int_distribution<T> dis(a, b);
+    return dis(gen);
+}
+
+template <std::floating_point T> T random_uniform(T a, T b)
 {
     std::uniform_real_distribution<T> dis(a, b);
     return dis(gen);

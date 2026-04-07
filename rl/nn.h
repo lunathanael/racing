@@ -78,8 +78,7 @@ public:
 
     template <class _T, size_t _M> auto forward(const Tensor<_T, _M> &input)
     {
-        auto input_span = std::mdspan<const _T, std::extents<size_t, 1, _M>>(input.data());
-        auto out = matmul(input_span, _weight(), _bias());
+        auto out = matmul(nn::unsqueeze<0>(nn::to_mdspan(input)), _weight(), _bias());
         return out[0];
     }
 };
