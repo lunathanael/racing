@@ -3,44 +3,68 @@ set -e
 
 cd "$(dirname "$0")"
 
+BUILD_TYPE="Release"
 CLEAN=0
+VAL=0
+
+# Parse args
 for arg in "$@"; do
     case $arg in
+        debug)
+            BUILD_TYPE="Debug"
+            ;;
+        release)
+            BUILD_TYPE="Release"
+            ;;
+        profile)
+            BUILD_TYPE="RelWithDebInfo"
+            ;;
+        relwithdebinfo)
+            BUILD_TYPE="RelWithDebInfo"
+            ;;
         --clean)
             CLEAN=1
+            ;;
+        --val)
+            VAL=1
             ;;
     esac
 done
 
+echo "Build type: $BUILD_TYPE"
+
 if [ -f "./emsdk/emsdk_env.sh" ]; then
     source ./emsdk/emsdk_env.sh >/dev/null 2>&1
-else
-    echo "Warning: emsdk_env.sh not found in ./emsdk/. You may need to install or source it manually."
 fi
 
-mkdir -p build build-wasm
-cmake -G Ninja -S . -B build
-emcmake cmake -G Ninja -S . -B build-wasm
+TRACK_DATA_DIR="track_data"
+BUILD_DIR="build"
+BUILD_WASM_DIR="build-wasm"
+
+mkdir -p "$BUILD_DIR" "$BUILD_WASM_DIR"
+
+cmake -G Ninja -S . -B "$TRACK_DATA_DIR"
+cmake -G Ninja -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+emcmake cmake -G Ninja -S . -B "$BUILD_WASM_DIR" -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
 if [ "$CLEAN" -eq 1 ]; then
-    cmake --build build --target clean
-    cmake --build build-wasm/ --target clean
+    cmake --build "$BUILD_DIR" --target clean
+    cmake --build "$BUILD_WASM_DIR" --target clean
 fi
 
-echo "Building Racer Binary"
-cmake --build build/ --parallel --target racer
+echo "Building track data..."
+cmake --build "$TRACK_DATA_DIR" --parallel --target data
 
-echo "Building RL Racer"
-cmake --build build/ --parallel --target racer_rl
+echo "Building native targets..."
+cmake --build "$BUILD_DIR" --parallel --target racer racer_rl racer_ap
 
-echo "Building AP Racer"
-cmake --build build/ --parallel --target racer_ap
+if [ "$VAL" -eq 1 ]; then
+    echo "Building validation..."
+    cmake --build "$BUILD_DIR" --parallel --target validation
+fi
 
-echo "Building WASM Emscripten Racer"
-cmake --build build-wasm/ --parallel --target racer
+echo "Building wasm targets..."
+cmake --build "$BUILD_WASM_DIR" --parallel --target racer racer_ap
 
-echo "Building AP Racer"
-cmake --build build-wasm/ --parallel --target racer_ap
-
-echo "Native: ./build/racer"
-echo "WASM:   cd build-wasm && python3 -m http.server"
+echo "Native: ./$BUILD_DIR/racer"
+echo "WASM:   cd $BUILD_WASM_DIR && python3 -m http.server"

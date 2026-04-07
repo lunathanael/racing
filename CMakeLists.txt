@@ -11,12 +11,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(ENABLE_VALIDATION "Build validation targets" ON)
+
 add_compile_options(
     -Wall -Wextra -Wpedantic -Wno-unused-parameter
-    -O3
-    -pipe
-    -flto
 )
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG -fno-omit-frame-pointer")
+
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 # TARGET LIB
 
@@ -36,7 +45,7 @@ set(GAME_HEADERS
 )
 
 add_library(${TARGET_LIB} STATIC ${GAME_SOURCES} ${GAME_HEADERS})
-target_include_directories(${TARGET_LIB} PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(${TARGET_LIB} PUBLIC ${CMAKE_SOURCE_DIR})
 
 set(RENDER_SOURCES
     render/car.cpp
@@ -156,9 +165,7 @@ add_custom_command(
     COMMENT "Generating index"
 )
 
-add_custom_target(track_data_index ALL DEPENDS track_data ${TRACK_DATA_DIR}/index)
-
-add_dependencies(${TARGET_LIB} track_data_index)
+add_custom_target(data DEPENDS track_data ${TRACK_DATA_DIR}/index)
 
 if(EMSCRIPTEN)
     set_target_properties(${TARGET} PROPERTIES SUFFIX ".html")
@@ -192,3 +199,7 @@ target_compile_features(${TARGET_RENDER_LIB} PUBLIC cxx_std_23)
 target_compile_features(${TARGET} PRIVATE cxx_std_23)
 target_compile_features(${TARGET_RL} PRIVATE cxx_std_23)
 target_compile_features(${TARGET_AP} PRIVATE cxx_std_23)
+
+if(ENABLE_VALIDATION)
+    add_subdirectory(validation)
+endif()
