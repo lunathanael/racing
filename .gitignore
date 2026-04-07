@@ -1,11 +1,8 @@
 .cache/
 .vscode/
 build*/
-emdsdk/
-SDL/
 .venv/
 .cache/
-emsdk/
 track_data/
 track_imgs/
 *.bin
