@@ -1,9 +1,10 @@
+#include "rl/ag.h"
 #include "rl/core.h"
 
 #include <algorithm>
 #include <benchmark/benchmark.h>
 
-template <typename T, size_t N, size_t K, size_t M> void BM_MatMul(benchmark::State &state)
+template <class T, size_t N, size_t K, size_t M> void BM_MatMul(benchmark::State &state)
 {
     nn::rand::seed(42);
     nn::Tensor<nn::Tensor<T, K>, N> A{};

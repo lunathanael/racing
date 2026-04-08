@@ -35,6 +35,7 @@ FetchContent_MakeAvailable(benchmark)
 set(BENCHMARK_SOURCES
     benchmark/main.cpp
     benchmark/matmul.cpp
+    benchmark/autograd.cpp
 )
 
 add_executable(${BENCHMARK_TARGET} ${BENCHMARK_SOURCES})
