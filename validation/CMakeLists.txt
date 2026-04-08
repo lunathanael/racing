@@ -37,6 +37,7 @@ set(BENCHMARK_SOURCES
     benchmark/main.cpp
     benchmark/matmul.cpp
     benchmark/autograd.cpp
+    benchmark/train.cpp
 )
 
 add_executable(${BENCHMARK_TARGET} ${BENCHMARK_SOURCES})
