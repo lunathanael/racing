@@ -64,8 +64,8 @@ public:
 
         if (init)
         {
-            for (size_t i = 0; i < N; ++i)
-                for (size_t j = 0; j < M; ++j)
+            for (size_t i = 0; i < M; ++i)
+                for (size_t j = 0; j < N; ++j)
                     _weight()[i, j] = rand::random_uniform(-sqrt_k, sqrt_k);
 
             if constexpr (use_bias)

@@ -6,6 +6,7 @@
 #include <numbers>
 #include <ranges>
 #include <unordered_set>
+#include <vector>
 
 namespace nn
 {
