@@ -14,6 +14,7 @@ set(BENCHMARK_TARGET benchmark_all)
 set(TEST_SOURCES
     test/main.cpp
     test/test_matmul.cpp
+    test/test_train.cpp
 )
 
 add_executable(${TEST_TARGET} ${TEST_SOURCES})
