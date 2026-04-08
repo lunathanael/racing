@@ -20,7 +20,7 @@ template <class T, size_t N_PARAMS, bool autograd, class node_t = cond_node_t<T,
 class Params : protected base_t
 {
 public:
-    using base_t::base_t;
+    template <class... Args> Params(Args &&...args) : base_t(std::forward<Args>(args)...) { global_tape<T>.lock(); }
 
     Params(const std::string &file)
     {

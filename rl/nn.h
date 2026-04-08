@@ -66,20 +66,19 @@ public:
         {
             for (size_t i = 0; i < M; ++i)
                 for (size_t j = 0; j < N; ++j)
-                    _weight()[i, j] = rand::random_uniform(-sqrt_k, sqrt_k);
+                    _weight()[i, j].data() = rand::random_uniform(-sqrt_k, sqrt_k);
 
             if constexpr (use_bias)
             {
                 for (size_t i = 0; i < N; ++i)
-                    _bias()[0, i] = rand::random_uniform(-sqrt_k, sqrt_k);
+                    _bias()[0, i].data() = rand::random_uniform(-sqrt_k, sqrt_k);
             }
         }
     }
 
     template <class _T, size_t _M> auto forward(const Tensor<_T, _M> &input)
     {
-        auto out = matmul(nn::unsqueeze<0>(nn::to_mdspan(input)), _weight(), _bias());
-        return out[0];
+        return std::get<0>(matmul(nn::unsqueeze<0>(nn::to_mdspan(input)), _weight(), _bias()));
     }
 };
 

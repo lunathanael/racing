@@ -24,17 +24,25 @@ Action get_actions(Env &env, bool force_network = false)
 
     static nn::Sequential<nn::Linear<OBS_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
                           nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>>
-        seq("seq.bin");
+        seq("best/seq.bin");
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_steer("pol_steer.bin");
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_drive("pol_drive.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_steer("best/pol_steer.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_drive("best/pol_drive.bin");
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 1, T>> val("val.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, 1, T>> val("best/val.bin");
 
     static nn::AdamW opt(seq.params(), 1e-4);
     static nn::AdamW opt1a(pol_steer.params(), 1e-4);
     static nn::AdamW opt1b(pol_drive.params(), 1e-4);
     static nn::AdamW opt2(val.params(), 1e-4);
+
+    static bool locked = false;
+
+    if (!locked)
+    {
+        nn::global_tape<T>.lock();
+        locked = true;
+    }
 
     struct Transition
     {
@@ -171,7 +179,7 @@ Action get_actions(Env &env, bool force_network = false)
             auto h = seq.forward(inp);
             auto probs_steer = pol_steer.forward(h);
             auto probs_drive = pol_drive.forward(h);
-            auto value = val.forward(h)[0];
+            auto value = std::get<0>(val.forward(h));
 
             T advantage = returns[i] - value.data();
 
@@ -180,7 +188,7 @@ Action get_actions(Env &env, bool force_network = false)
             auto value_loss = (value - returns[i]) * (value - returns[i]);
             auto step_loss = policy_loss + value_loss * T(0.1);
 
-            return std::make_tuple(step_loss, policy_loss, value_loss);
+            return std::make_tuple(std::move(step_loss), std::move(policy_loss), std::move(value_loss));
         };
 
         auto [total_loss, policy_loss, value_loss] = build_step_loss(0);
@@ -195,17 +203,18 @@ Action get_actions(Env &env, bool force_network = false)
         total_loss = total_loss / T(N);
         policy_loss = policy_loss / T(N);
         value_loss = value_loss / T(N);
+
+        std::print("Episode {}, steps {}, total loss {:.5f}, policy loss {:.5f}, value loss {:.5f}, mean_G {:.3f}",
+                   total_laps, N, static_cast<T>(total_loss), static_cast<T>(policy_loss), static_cast<T>(value_loss),
+                   mean);
+        std::cout << std::endl;
+
         total_loss.backward();
 
         opt.step();
         opt1a.step();
         opt1b.step();
         opt2.step();
-
-        std::print("Episode {}, steps {}, total loss {:.5f}, policy loss {:.5f}, value loss {:.5f}, mean_G {:.3f}",
-                   total_laps, N, static_cast<T>(total_loss), static_cast<T>(policy_loss), static_cast<T>(value_loss),
-                   mean);
-        std::cout << std::endl;
 
         if (total_laps % 10 == 0)
         {

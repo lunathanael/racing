@@ -20,8 +20,6 @@ inline T target_fn(T x)
 constexpr size_t HIDDEN_DIM = 16;
 constexpr size_t BATCH_SIZE = 32;
 constexpr size_t TRAIN_STEPS = 100;
-constexpr size_t EVAL_STEPS = 500;
-constexpr T LOSS_TOL = 1e-3;
 constexpr T lr = 1e-2;
 
 } // namespace
@@ -44,7 +42,7 @@ void BM_TrainMLPSin(benchmark::State &state)
             {
                 auto x = nn::rand::random_uniform<T>(-1, 1);
                 auto input = nn::Tensor<T, 1>{ x };
-                auto pred = seq.forward(input)[0];
+                auto pred = std::get<0>(seq.forward(input));
                 auto actual = target_fn(x);
                 auto loss = (pred - actual) * (pred - actual);
                 total_loss += loss;

@@ -124,12 +124,13 @@ template <class T> decltype(auto) exp(T &&v)
 
 decltype(auto) softmax(auto &&arr)
 {
-    const auto mx = *std::max_element(arr.cbegin(), arr.cend());
-    using T = std::decay_t<decltype(mx)>;
+    const auto mx = std::max_element(arr.cbegin(), arr.cend())->data();
     std::transform(arr.begin(), arr.end(), arr.begin(), [mx](auto &&x) { return std::forward<decltype(x)>(x) - mx; });
     std::transform(arr.begin(), arr.end(), arr.begin(), [](auto &&x) { return exp(std::forward<decltype(x)>(x)); });
+    using T = std::decay_t<decltype(std::get<0>(arr))>;
     const auto sum = std::accumulate(arr.cbegin(), arr.cend(), T{});
-    std::transform(arr.begin(), arr.end(), arr.begin(), [sum](auto &&x) { return std::forward<decltype(x)>(x) / sum; });
+    std::transform(arr.begin(), arr.end(), arr.begin(),
+                   [&sum](auto &&x) { return std::forward<decltype(x)>(x) / sum; });
     return arr;
 }
 
