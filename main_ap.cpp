@@ -35,15 +35,15 @@ Action get_actions(const Env &env)
     constexpr f64_t MIN_DIST_TO_SHARP_TURN = 57.32;
 
     Action actions;
-    const auto &obs = env.get_obs<100>();
+    const auto obs = env.get_obs<100>();
 
     f64_t BRAKE_DIST = 0.5 * obs.vel.x * (obs.vel.x / Car::BREAKING_SPEED);
     f64_t dist{}, disty{};
     for (size_t i = 0; i < obs.future_points.size(); ++i)
     {
         const auto &next = obs.future_points[i];
-        dist += next.x;
-        disty += next.y;
+        dist += next.center.x;
+        disty += next.center.y;
         if (dist > BRAKE_DIST)
             break;
         if (std::abs(disty) >= MIN_DIST_TO_TURN)
