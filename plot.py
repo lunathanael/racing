@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 log_file = "logs.txt"
 
@@ -95,30 +96,29 @@ def plot_log(event=None):
     axs[0, 0].legend()
     axs[0, 0].grid(True)
 
-    # Steps
-    axs[0, 1].plot(df["episode"], df["steps"], label="Steps")
-    axs[0, 1].set_xlabel("Episode")
-    axs[0, 1].set_ylabel("Steps")
-    axs[0, 1].set_title("Steps per Episode")
-    axs[0, 1].grid(True)
-
     # Mean Return
-    axs[1, 0].plot(df["episode"], df["mean_G"], label="Mean G")
-    axs[1, 0].set_xlabel("Episode")
-    axs[1, 0].set_ylabel("mean_G")
-    axs[1, 0].set_title("Mean Return")
-    axs[1, 0].grid(True)
+    axs[0, 1].plot(df["episode"], df["mean_G"], label="Mean G")
+    axs[0, 1].set_xlabel("Episode")
+    axs[0, 1].set_ylabel("mean_G")
+    axs[0, 1].set_title("Mean Return")
+    axs[0, 1].grid(True)
 
     train_ep, train_times, train_ticks = train_data
     val_ep, val_times, val_ticks = val_data
 
-    axs[1, 1].plot(train_ep, train_times, marker='o', linestyle='-', label="Lap time")
+    # Seconds
+    axs[1, 0].plot(val_ep, val_times, marker='x', linestyle='-', label="Val time")
+    axs[1, 0].plot(train_ep, train_times, marker='o', linestyle='-', label="Lap time")
+    axs[1, 0].set_xlabel("Episode")
+    axs[1, 0].set_ylabel("Seconds")
+    axs[1, 0].set_title("Seconds per Episode")
+    axs[1, 0].grid(True)
+
     axs[1, 1].plot(train_ep, train_ticks, marker='.', linestyle='--', label="Lap ticks")
 
-    axs[1, 1].plot(val_ep, val_times, marker='x', linestyle='-', label="Val time")
     axs[1, 1].plot(val_ep, val_ticks, marker='x', linestyle='--', label="Val ticks")
 
-    axs[1, 1].set_title("Time + Ticks")
+    axs[1, 1].set_title("Ticks")
     axs[1, 1].legend()
     axs[1, 1].grid(True)
 
@@ -128,9 +128,6 @@ def plot_log(event=None):
 
 plot_log()
 
-fig.canvas.mpl_connect(
-    'key_press_event',
-    lambda event: plot_log() if event.key == 'r' else None
-)
+ani = FuncAnimation(fig, plot_log, interval=1000)
 
 plt.show(block=True)
