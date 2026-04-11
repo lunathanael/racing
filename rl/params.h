@@ -82,12 +82,28 @@ public:
     }
 
     void zero_grad()
+        requires(autograd)
     {
-        if constexpr (autograd)
-        {
-            for (auto &p : base_t::data())
-                p.grad() = 0;
-        }
+        for (auto &p : *this)
+            p.grad() = 0;
+    }
+
+    auto clip_grad_norm(const T max_norm = T{ 1.0 })
+        requires(autograd)
+    {
+        constexpr T eps = T(1e-6);
+
+        T total_norm = 0;
+        for (const auto &p : *this)
+            total_norm += p.grad() * p.grad();
+        total_norm = std::sqrt(total_norm);
+
+        const auto clip_coef = max_norm / (total_norm + eps);
+        if (clip_coef < T{ 1.0 })
+            for (auto &p : *this)
+                p.grad() *= clip_coef;
+
+        return total_norm;
     }
 };
 } // namespace nn
