@@ -10,9 +10,14 @@ class Env
 {
 public:
     using float_t = f64_t;
+
+    struct point_t
+    {
+        vec<float_t> center; //, left_edge, right_edge;
+    };
     template <size_t N_FUTURE_POINTS> struct obs_t
     {
-        using points_t = std::array<vec<float_t>, N_FUTURE_POINTS>;
+        using points_t = std::array<point_t, N_FUTURE_POINTS>;
         vec<float_t> vel;
         points_t future_points;
     };
@@ -46,16 +51,11 @@ private:
                       [&](auto &p)
                       {
                           const auto idx = &p - points.data();
-                          if (idx == 0)
-                          {
-                              p = (vertices[next_point].center - pos).rotate(dir);
-                              return;
-                          }
                           const auto current_idx = (next_point + idx) % n_points;
-                          const auto next_idx = (next_point + idx + 1) % n_points;
-                          const auto &current = vertices[current_idx].center;
-                          const auto &next = vertices[next_idx].center;
-                          p = (next - current).rotate(dir);
+                          const auto prev_idx = (next_point + idx - 1) % n_points;
+                          const auto &prev = (idx == 0) ? pos : vertices[prev_idx].center;
+                          const auto &current = vertices[current_idx];
+                          p.center = (current.center - prev).rotate(dir);
                       });
         return points;
     }
