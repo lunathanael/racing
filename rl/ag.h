@@ -132,6 +132,8 @@ public:
 
     auto operator-() const { return *this * -1; }
 
+    auto abs() const { return _build_node(std::abs(data()), T{ ((data() > 0) ? 1 : -1) * (data() != 0) }); }
+
     auto relu() const { return _build_node(std::max(T{ 0 }, data()), T{ static_cast<T>(data() > 0) }); }
 
     auto leaky_relu() const
