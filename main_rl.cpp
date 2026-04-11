@@ -13,28 +13,34 @@ Action get_actions(Env &env, bool force_network = false)
     constexpr size_t POINT_EL = N_FUTURE_POINTS * 2;
     constexpr size_t VEL_EL = 2;
 
-    constexpr size_t OBS_DIM = POINT_EL + VEL_EL;
-    constexpr size_t HIDDEN_DIM = 16;
+    constexpr size_t OBS_DIM = POINT_EL * 1 + VEL_EL;
+    constexpr size_t HIDDEN_DIM = 32;
 
     using T = nn::f64_t;
     constexpr T gamma = 0.995;
 
     constexpr int AP_LAPS = 100;
-    constexpr int MAX_TICKS = 2300;
+    constexpr int MAX_TICKS = 2000;
 
-    static nn::Sequential<nn::Linear<OBS_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
-                          nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>>
-        seq("best/seq.bin");
+    static nn::Sequential<nn::Linear<OBS_DIM, HIDDEN_DIM * 2, T>, nn::LeakyReLU<HIDDEN_DIM * 2, T>,
+                          nn::Linear<HIDDEN_DIM * 2, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>>
+        seq;
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_steer("best/pol_steer.bin");
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>> pol_drive("best/pol_drive.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
+                          nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>>
+        pol_steer;
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
+                          nn::Linear<HIDDEN_DIM, 3, T>, nn::Softmax<3, T>>
+        pol_drive;
 
-    static nn::Sequential<nn::Linear<HIDDEN_DIM, 1, T>> val("best/val.bin");
+    static nn::Sequential<nn::Linear<HIDDEN_DIM, HIDDEN_DIM, T>, nn::LeakyReLU<HIDDEN_DIM, T>,
+                          nn::Linear<HIDDEN_DIM, 1, T>>
+        val;
 
-    static nn::AdamW opt(seq.params(), 1e-4);
-    static nn::AdamW opt1a(pol_steer.params(), 1e-4);
-    static nn::AdamW opt1b(pol_drive.params(), 1e-4);
-    static nn::AdamW opt2(val.params(), 1e-4);
+    static nn::AdamW opt(seq.params(), 1e-3);
+    static nn::AdamW opt1a(pol_steer.params(), 1e-3);
+    static nn::AdamW opt1b(pol_drive.params(), 1e-3);
+    static nn::AdamW opt2(val.params(), 1e-2);
 
     static bool locked = false;
 
@@ -76,8 +82,14 @@ Action get_actions(Env &env, bool force_network = false)
         size_t idx = 0;
         for (const auto &p : obs.future_points)
         {
-            input[idx++] = (p.x / 30);
-            input[idx++] = (p.y / 30);
+            input[idx++] = (p.center.x / 30);
+            input[idx++] = (p.center.y / 30);
+            // input[idx++] = (p.left_edge.x / 30);
+            // input[idx++] = (p.left_edge.y / 30);
+            // input[idx++] = (p.right_edge.x / 30);
+            // input[idx++] = (p.right_edge.y / 30);
+            // input[idx++] = (p.rel_center.x / 30);
+            // input[idx++] = (p.rel_center.y / 30);
         }
         input[idx++] = (obs.vel.x / Car::MAX_SPEED);
         input[idx++] = (obs.vel.y / Car::MAX_SPEED);
@@ -134,12 +146,15 @@ Action get_actions(Env &env, bool force_network = false)
         }
         int lm = (int)(static_cast<double>(cnt) / 60.0);
         float ls = static_cast<float>(cnt - lm * 60);
-        std::print("Test validation time:{}:{}, {}\n", lm, ls, race.get_next_vertex_idx());
+        auto score = race.get_next_vertex_idx();
+        if (score == 0)
+            score = race.get_vertex_count();
+        if (race.get_lap_count() != 0)
+            score += race.get_vertex_count();
+        std::print("Test validation time:{}:{}, {}\n", lm, ls, score);
     };
 
-    if ((env.get_game().get_race().get_lap_count() >= 1 || episode.size() >= MAX_TICKS ||
-         episode.size() >= env.get_game().get_race().get_next_vertex_idx() * 4 + 200) &&
-        !episode.empty())
+    if ((env.get_game().get_race().get_lap_count() >= 1 || episode.size() >= MAX_TICKS) && !episode.empty())
     {
         int lm = (int)(episode.size() / 60.0);
         float ls = static_cast<float>(episode.size() - lm * 60);
@@ -165,6 +180,26 @@ Action get_actions(Env &env, bool force_network = false)
             mean += r;
         mean /= T(N);
 
+        T adv_mean = 0, adv_var = 0;
+        std::vector<T> advantages(N);
+        for (size_t i = 0; i < N; ++i)
+        {
+            nn::Tensor<T, OBS_DIM> inp;
+            for (size_t j = 0; j < OBS_DIM; ++j)
+                inp[j] = episode[i].obs[j];
+            auto h = seq.forward(inp);
+            auto value = std::get<0>(val.forward(h));
+            advantages[i] = static_cast<T>(returns[i] - value);
+        }
+        for (auto a : advantages)
+            adv_mean += a;
+        adv_mean /= N;
+        for (auto a : advantages)
+            adv_var += (a - adv_mean) * (a - adv_mean);
+        adv_var = sqrt(adv_var / N + 1e-8);
+        for (auto &a : advantages)
+            a = (a - adv_mean) / adv_var;
+
         opt.zero_grad();
         opt1a.zero_grad();
         opt1b.zero_grad();
@@ -181,12 +216,21 @@ Action get_actions(Env &env, bool force_network = false)
             auto probs_drive = pol_drive.forward(h);
             auto value = std::get<0>(val.forward(h));
 
-            T advantage = returns[i] - value.data();
+            const auto advantage = advantages[i];
 
             auto policy_loss = -(probs_steer[episode[i].action_idx_steer] + T(1e-8)).ln() * advantage;
             policy_loss += -(probs_drive[episode[i].action_idx_drive] + T(1e-8)).ln() * advantage;
-            auto value_loss = (value - returns[i]) * (value - returns[i]);
-            auto step_loss = policy_loss + value_loss * T(0.1);
+            auto value_loss = (value - returns[i]) ^ 2;
+            auto step_loss = policy_loss + value_loss * T{ 0.1 };
+
+            constexpr T entropy_coeff = 0.01;
+            nn::AutogradNode<T> entropy{};
+            for (size_t j = 0; j < 3; ++j)
+            {
+                entropy += -(probs_steer[j] * (probs_steer[j] + T(1e-8)).ln());
+                entropy += -(probs_drive[j] * (probs_drive[j] + T(1e-8)).ln());
+            }
+            step_loss -= entropy_coeff * entropy;
 
             return std::make_tuple(std::move(step_loss), std::move(policy_loss), std::move(value_loss));
         };
@@ -211,12 +255,17 @@ Action get_actions(Env &env, bool force_network = false)
 
         total_loss.backward();
 
+        seq.params().clip_grad_norm();
+        pol_steer.params().clip_grad_norm();
+        pol_drive.params().clip_grad_norm();
+        val.params().clip_grad_norm(2.0);
+
         opt.step();
         opt1a.step();
         opt1b.step();
         opt2.step();
 
-        if (total_laps % 10 == 0)
+        if (total_laps % 50 == 0)
         {
             seq.params().save("seq.bin");
             pol_steer.params().save("pol_steer.bin");
@@ -237,9 +286,12 @@ Action get_actions(Env &env, bool force_network = false)
 
     auto act = one_hot_decode(nn_probs_steer, nn_probs_drive);
 
-    size_t score = env.get_game().get_race().get_lap_count() * env.get_game().get_race().get_vertex_count() +
-                   env.get_game().get_race().get_next_vertex_idx();
-    T reward = (static_cast<T>(score) - static_cast<T>(prev_score)) / 100;
+    size_t score = env.get_game().get_race().get_next_vertex_idx();
+    if (score == 0)
+    {
+        score = env.get_game().get_race().get_vertex_count();
+    }
+    T reward = (static_cast<T>(score) - static_cast<T>(prev_score));
 
     prev_score = score;
 
